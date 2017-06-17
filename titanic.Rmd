@@ -1,0 +1,590 @@
+---
+title: "Survival Predicted by Logistic Regression"
+author: "Sarah VCH"
+---
+```{r}
+library(randomForest)
+library(Amelia)
+library(dplyr)
+library(ggplot2)
+library(rmarkdown)
+library(caTools)
+library(stringr)
+library(randomForest)
+
+train <- read.csv("../input/train.csv")
+test  <- read.csv("../input/test.csv")
+```
+# Did class affect survival?
+#### To no ones surprise, it does looks like class affected survival. 
+##### 63% of the first class passengers survived
+##### 47% of the second class passengers survived
+##### 24% of third class passengers survived
+
+
+
+```{r}
+#set Survied as factor 1 = Survived, 0 = Did not make it
+train$Survived <- factor(train$Survived)
+train$Pclass <- as.factor(train$Pclass)
+levels(train$Pclass) <- c("1st Class", "2nd Class", "3rd Class")
+
+fir.cl <-subset(train, train$Pclass == '1st Class')
+sec.cl <-subset(train, train$Pclass == '2nd Class')
+thr.cl <-subset(train, train$Pclass == '3rd Class')
+
+#percent survival of first class
+fir.perc <- (nrow(subset(fir.cl, fir.cl$Survived == 1))/nrow(fir.cl))*100
+
+#percent survival of second class
+sec.perc <- (nrow(subset(sec.cl, sec.cl$Survived == 1))/nrow(sec.cl))*100
+
+#percent survival of first class
+thr.per <- (nrow(subset(thr.cl, thr.cl$Survived == 1))/nrow(thr.cl))*100
+
+class <- matrix(c(fir.perc,sec.perc,thr.per),ncol=1,byrow=FALSE)
+colnames(class) <- c("Percent Survied")
+rownames(class) <- c("1st", "2nd", "3rd")
+class <- as.table(class)
+class
+
+ggplot(train,aes(Pclass)) + geom_bar(aes(fill=factor(Survived)),alpha=0.5, width =0.5, color='black') + scale_fill_discrete(name="Survived", breaks=c("0", "1"), labels=c("Died", "Survived")) + labs(title = "Survival Based on Class")
+```
+
+# Did gender affect survival?
+#### Survival varied greatly with gender
+##### 74% of female passengers survived
+##### 19% of male passengers survived
+
+```{r}
+men <-subset(train, train$Sex == 'male')
+women <-subset(train, train$Sex == 'female')
+per.men <-(nrow(subset(men, men$Survived == 1))/nrow(men))*100
+per.wom <-(nrow(subset(women, women$Survived == 1))/nrow(women))*100
+
+gender <- matrix(c(per.men, per.wom),ncol=1,byrow=FALSE)
+colnames(gender) <- c("Percent Survied")
+rownames(gender) <- c("men","women")
+gender <- as.table(gender)
+gender
+
+ggplot(train,aes(Sex)) + geom_bar(aes(fill=factor(Survived)), alpha=0.5, color='black') + scale_fill_discrete(name="Survived", breaks=c("0", "1"), labels=c("Died", "Survived")) + labs(title = "Survival Based on Gender")
+```
+
+# Did age affect Survival?
+#### It looks like age had some impact on passenger survival
+##### 58% of passengers under 15 survied
+##### 38% of passengers 15-33 survied
+##### 42% of passengers 34-55 survied
+##### 31% of passengers over 56 survived
+
+```{r}
+kids <- subset(train, train$Age <= 14)
+young <- subset(train, train$Age >= 15 & train$Age <= 33)
+midage <- subset(train, train$Age >=34 & train$Age <= 55)
+older <- subset(train, train$Age >= 56)
+
+kids.sur <-nrow(subset(kids, kids$Survived == 1))/nrow(kids)*100
+young.sur <-nrow(subset(young, young$Survived == 1))/nrow(young)*100
+midage.sur <-nrow(subset(midage, midage$Survived == 1))/nrow(midage)*100
+older.sur <- nrow(subset(older, older$Survived == 1))/nrow(older)*100
+
+age1 <- matrix(c(kids.sur,young.sur,midage.sur,older.sur),ncol=1,byrow=FALSE)
+colnames(age1) <- c("Percent Survied")
+rownames(age1) <- c("under 15","15-33","34-55","56+")
+age1 <- as.table(age1)
+age1
+
+
+ggplot(train,aes(Age)) + geom_histogram(aes(fill=factor(Survived)), color='black', alpha=0.5, binwidth =5) + scale_fill_discrete(name="Survived", breaks=c("0", "1"), labels=c("Died", "Survived")) + labs(title = "Survival Based on Age")
+```
+
+## Did fare effect Survival?
+#### It does look like passenger survival increased with fare
+##### For the 651 passengers that paid under $30 only 30% Survived
+##### For the 79 passengers that paid between $30-$50 41% Survived
+##### For the 161 passengers that paid over $50 68% Survived
+
+```{r}
+under.30 <-subset(train, train$Fare < 30)
+bt30.50 <-subset(train, train$Fare >= 30 & train$Fare < 50)
+over.50 <-subset(train, train$Fare >= 50)
+
+nrow(under.30)
+nrow(bt30.50)
+nrow(over.50)
+
+
+under <- nrow(subset(under.30, under.30$Survived ==1))/(nrow(under.30))*100
+btw <-  nrow(subset(bt30.50, bt30.50$Survived ==1))/(nrow(bt30.50))*100
+over <- nrow(subset(over.50, over.50$Survived ==1))/(nrow(over.50))*100
+
+fr <- matrix(c(under,btw,over),ncol=1,byrow=FALSE)
+colnames(fr) <- c("Percent Survied")
+rownames(fr) <- c("under 30","30-50","over 50")
+fr <- as.table(fr)
+fr
+
+ggplot(train,aes(Fare)) + geom_histogram(aes(fill=factor(Survived)), color='black', alpha=0.5) + scale_fill_discrete(name="Survived", breaks=c("0", "1"), labels=c("Died", "Survived")) + labs(title = "Survival Based on Fare")
+```
+
+# Did it matter where people boarded?
+#### C = Cherbourg, Q = Queenstown, S = Southampton
+#### 55% of passengers that boarded from Cherbourg survived
+#### 39%% of passengers that boarded from Queenstown survived
+#### 34% of passengers that boarded from Southhampton survived
+
+# Did more men board in Southhampton?
+#### In Southhampton 68% of the passengers were men where as Cherbour and Qeenstown it was closer to 50% 
+
+```{r}
+
+c <- subset(train, train$Embarked == "C")
+q <- subset(train, train$Embarked == "Q")
+s <- subset(train, train$Embarked == "S")
+
+c.per <- nrow(subset(c, c$Survived == 1))/(nrow(c))*100
+s.per <- nrow(subset(s, s$Survived == 1))/(nrow(s))*100
+q.per <- nrow(subset(q, q$Survived == 1))/(nrow(q))*100
+
+loc <- matrix(c(c.per,q.per, s.per),ncol=1,byrow=FALSE)
+colnames(loc) <- c("Percent Survied")
+rownames(loc) <- c("Cherbourg", "Queenstown", "Southhampton")
+loc <- as.table(loc)
+loc
+
+c.men <- nrow(subset(c, c$Sex == 'male'))/(nrow(c))*100
+s.men <- nrow(subset(s, s$Sex == 'male'))/(nrow(s))*100
+q.men <- nrow(subset(q, q$Sex == 'male'))/(nrow(q))*100
+
+sx <- matrix(c(c.men,q.men, s.men),ncol=1,byrow=FALSE)
+colnames(sx) <- c("Percent Men")
+rownames(sx) <- c("Cherbourg", "Queenstown", "Southhampton")
+sx <- as.table(sx)
+sx
+
+ggplot(train,aes(Embarked)) + geom_bar(aes(fill=factor(Survived)), color='black', alpha=0.5) + scale_fill_discrete(name="Survived", breaks=c("0", "1"), labels=c("Died", "Survived")) + labs(title = "Survival Based on Boarding Location")
+ggplot(train,aes(Embarked, Fare)) + geom_point(aes(color=factor(Sex)), alpha=0.5, position='jitter') + coord_cartesian(ylim=c(0, 300))
+```
+
+#Lets remove the blank Embarked rows
+
+```{r}
+
+train$Embarked <- as.character(train$Embarked)
+train <- subset(train, train$Embarked != "")
+train$Embarked <- as.factor(train$Embarked)
+str(train)
+
+```
+
+# Did passengerId affect Survival?
+#### Looking at the graph below it doesn not appear that Passenger Id affected survival
+
+```{r}
+ggplot(train,aes(Survived, PassengerId)) + geom_boxplot(aes(color=factor(Survived))) + labs(title ='Survival based on Id')
+```
+
+# Did the number of Siblings and Spouses effect Survival?
+#### SibSp = # of siblings / spouses aboard the Titanic
+#### Passengers faired better with one or two other significant others
+Only 34% of passengers traveling alone survived. A much higher percent of passengers survived when traveling with another. Passengers traveling with another had a 54% survival. 
+Passengers traveling with two others had a 46% survival. Passengers traveling with more than two other sibling or spouses had a lower percent of survival. Passengers with three siblings or spouses had a 25% change of survival. 
+Passengers traveling with four sibling or spouses had a 16% of survival. Passengers with over four sibliings or spouses did not survive
+
+
+```{r}
+zero <- subset(train, train$SibSp == 0)
+one <- subset(train, train$SibSp == 1)
+two <- subset(train, train$SibSp == 2)
+three <- subset(train, train$SibSp == 3)
+four <- subset(train, train$SibSp == 4)
+five <- subset(train, train$SibSp == 5)
+six <- subset(train, train$SibSp == 6)
+seven <- subset(train, train$SibSp == 7)
+eight <- subset(train, train$SibSp == 8)
+
+zero.per <- nrow(subset(zero, zero$Survived == 1))/nrow(zero)*100
+one.per <- nrow(subset(one, one$Survived == 1))/(nrow(one))*100
+two.per <- nrow(subset(two, two$Survived == 1))/(nrow(two))*100
+three.per <- nrow(subset(three, three$Survived == 1))/(nrow(three))*100
+four.per <- nrow(subset(four, four$Survived == 1))/(nrow(four))*100
+five.per <- nrow(subset(five, five$Survived == 1))/(nrow(five))*100
+six.per <- nrow(subset(six, six$Survived == 1))/(nrow(six))*100
+seven.per <- nrow(subset(seven, seven$Survived == 1))/(nrow(seven))*100
+eight.per <- nrow(subset(eight, eight$Survived == 1))/(nrow(eight))*100
+
+ss <- matrix(c(zero.per, one.per, two.per, three.per, four.per, five.per, six.per, seven.per, eight.per,nrow(zero),nrow(one), nrow(two),nrow(three), nrow(four), nrow(five), nrow(six), nrow(seven), nrow(eight)),ncol=2,byrow=FALSE)
+colnames(ss) <- c("Percent Survived", "Count in Group")
+rownames(ss) <- c("0","1", "2", "3", "4","5","6","7","8")
+ss <- as.table(ss)
+ss
+
+
+ggplot(train,aes(SibSp)) + geom_histogram(aes(fill=factor(Survived)), color='black', alpha=0.5) + scale_fill_discrete(name="Survived", breaks=c("0", "1"), labels=c("Died", "Survived")) + labs(title = "Survival Based on # Siblings and Spouses")
+```
+
+# Did the number of Parents and Children affect survival?
+#### Again it looks like people faired best with the addition of one other
+#### 34% of Passengers traveling without parent or child survived
+#### 55% of Passengers traveling with another survived
+#### 50% of Passengers traveling with two parents and or children survived
+#### 27% of Passengers traveling with three or more parents and or children survived
+
+```{r}
+
+par.zero <- subset(train, train$Parch == 0)
+par.one <- subset(train, train$Parch == 1)
+par.two <- subset(train, train$Parch == 2)
+par.threeup <- subset(train, train$Parch >=3)
+
+per.zero <- nrow(subset(par.zero, par.zero$Survived == 1))/nrow(par.zero)*100
+per.one <- nrow(subset(par.one, par.one$Survived == 1))/nrow(par.one)*100
+per.two <- nrow(subset(par.two, par.two$Survived == 1))/nrow(par.two)*100
+per.threeup <- nrow(subset(par.threeup, par.threeup$Survived == 1))/nrow(par.threeup)*100
+
+pc <- matrix(c(per.zero, per.one, per.two, per.threeup, nrow(par.zero), nrow(par.two), nrow(par.threeup)),ncol=2,byrow=FALSE)
+colnames(pc) <- c("Pecent Survival", "Count in Group")
+rownames(pc) <- c("0", "1", "2", "3+")
+pc <- as.table(pc)
+pc
+
+table(train$Parch)
+
+change <-function(parchi){
+  for(i in 1:length(parchi)){
+    if(parchi[i] == 9 | parchi[i] == 6){
+      parchi[i] <- 5
+    }else{
+      parchi[i] <- parchi[i]
+    }
+  }
+  return(parchi)
+}
+
+train$Parch <-change(train$Parch)
+
+ggplot(train,aes(Parch)) + geom_bar(aes(fill=factor(Survived)), color='black', alpha=0.5) + scale_fill_discrete(name="Survived", breaks=c("0", "1"), labels=c("Died", "Survived")) + labs(title = "Survival Based on Number of Parents and Children")
+
+```
+
+# Can we gather information based on cabin?
+#### It looks like there is mess of information in the cabin column and many missing values
+#### We could add all Cabin information to the model
+#### We could also simplify the Cabin information down to Known and Unknown
+
+
+```{r}
+table(train$cabin)
+
+train$Cabin <- as.character(train$Cabin)
+
+splt <- function(cabin){
+  for(i in 1:length(cabin)){
+    if(cabin[i] == ''){
+      cabin[i] <- cabin[i]
+    }else{
+      cabin[i] <- substring(cabin[i],1,1)
+    }
+  }
+  return(cabin)
+}
+
+train$Cabin <- splt(train$Cabin)
+ggplot(train, aes(Cabin)) + geom_bar(aes(fill=factor(Survived)),color='black', alpha=0.5) + scale_fill_discrete(name="Survived", breaks=c("0", "1"), labels=c("Died", "Survived")) + labs(title = "Survival Based on Cabin")
+
+known <- function(cabin){
+  for(i in 1:length(cabin)){
+    if(cabin[i] == ''){
+      cabin[i] <- 'unknown'
+    }else{
+      cabin[i] <- 'known'
+    }
+  }
+  return(cabin)
+}
+
+train$Cabin <- known(train$Cabin)
+
+ggplot(train, aes(Cabin)) + geom_bar(aes(fill=factor(Survived)),color='black', alpha=0.5) + scale_fill_discrete(name="Survived", breaks=c("0", "1"), labels=c("Died", "Survived")) + labs(title = "Cabin Known vs Unknown")
+
+
+```
+
+# Can we gather any information based on name?
+#### It looks like again women seemed to fair better than men
+#### I've condensed a few things down:
+
+
+```{r}
+s <- data.frame(str_split_fixed(train$Name, ",", 2))
+s1 <- data.frame(str_split_fixed(s$X2, ". ", 2))
+train$Name <- s1$X1
+str(train$Name)
+table(train$Name)
+ggplot(train, aes(factor(Name))) + geom_bar(aes(fill=factor(Survived)),color='black', alpha=0.5) + labs(title ='Title')
+train$Name <- as.character(train$Name)
+
+name.change <- function(title){
+  for(i in 1:length(title)){
+    if(title[i] == ' Master' ){
+      title[i] <- ' Mr'
+    }else if (title[i] == ' Ms'| title[i] == ' Lady' | title[i] == ' Dona'| title[i] == ' Mme' |title[i] == ' Mlle' | title[i] == ' th' |title[i] == ' Mrs' |title[i] == ' Miss'){
+      title[i] <- ' Ms'
+    }else if(title[i] == ' Don' | title[i] == ' Sir' | title[i] == ' Jonkheer' | title[i] == ' Col' | title[i] == ' Major' |title[i] == ' Capt' | title[i] == ' Dr'){
+      title[i] <- ' Titled Men'
+    }else{
+      title[i] <- title[i]
+    }
+  }
+  return(title)
+}
+
+train$Name <- sapply(train$Name, name.change)
+train$Name <- as.factor(train$Name)
+table(train$Name)
+
+ggplot(train, aes(factor(Name))) + geom_bar(aes(fill=factor(Survived)), color='black', alpha=0.5) + labs(title ='Title')
+
+```
+
+# What information went down with the ship?
+```{r}
+missmap(train, main="Titanic Training Data - Missing Map", col=c('yellow', 'black'), y.labels=c(''), y.at =c(1), legend=FALSE)
+```
+
+# Does age vary by class?
+#### first class has the highest mean age followed by second class and third class
+#### I'm filling in missing passengers ages with the average class age
+
+```{r}
+ggplot(train, aes(factor(Pclass), Age)) + geom_boxplot(aes(color=factor(Pclass))) + labs(title ='Age of Passengers by Class')
+
+train$Pclass <- as.character(train$Pclass)
+change.class <-function(classn){
+  for(i in 1:length(classn)){
+    if(classn[i] == '1st Class'){
+      classn[i] <- 1
+    }else if(classn[i] == '2nd Class'){
+      classn[i] <- 2
+    }else if(classn[i] == '3rd Class'){
+      classn[i] <- 3
+    }
+  }
+  return(classn)
+}
+
+train$Pclass <-change.class(train$Pclass)
+str(train$Pclass)
+
+mean((subset(train, train$Pclass == 1))$Age, na.rm=TRUE)
+mean((subset(train, train$Pclass == 2))$Age, na.rm=TRUE)
+mean((subset(train, train$Pclass == 3))$Age, na.rm=TRUE)
+```
+
+# Replace Age NA values with mean age from class
+#### first class, 38.23
+#### second class, 29.88
+#### thrid class, 25.14
+
+```{r}
+fillin_age <- function(age, class){
+  out <- age
+  for(i in 1:length(age)){
+    if(is.na(age[i])){
+      if(class[i] == 1){
+        out[i] <-38.23
+      }else if(class[i] ==2){
+        out[i] <-29.88
+      }else{
+        out[i] <-25.14
+      }
+    }else{
+      out[i] <-age[i]
+    }
+  }
+  return(out)
+}
+
+train$Age <-fillin_age(train$Age, train$Pclass)
+```
+
+#Check for missing values in Age
+#### Looks like age is filled up nicely with new imputed age
+
+```{r}
+missmap(train, main='Missing data', col=c("yellow","black"), legend = FALSE)
+```
+
+# Update feilds to factors and take out PassengerId and Ticket
+
+```{r}
+train$Survived <- as.factor(train$Survived)
+train$Pclass <- as.factor(train$Pclass)
+train$SibSp <- as.factor(train$SibSp)
+train$Parch <- as.factor(train$Parch)
+train$Cabin <- as.factor(train$Cabin)
+train <- select(train,-PassengerId,-Ticket)
+```
+
+# Train the model with subst of train data
+#### model = Survied preditced based off of all columns except Passenger ID and Ticket
+#### lowest P values: Pclass = 3, Age, SibSp = 3, Cabin = Unknown
+
+```{r}
+split = sample.split(train$Survived, SplitRatio = 0.70)
+final.train = subset(train, split == TRUE)
+final.test = subset(train, split == FALSE)
+
+final.log.model <- glm(formula=Survived ~ . , family = binomial(link='logit'),data = final.train)
+summary(final.log.model)
+fitted.probabilities <- predict(final.log.model,newdata=final.test,type='response')
+```
+
+# Confusion Matrix set up and Accuracy calculated
+
+```{r}
+d <-table(final.test$Survived, fitted.probabilities > 0.5)
+d
+sum(diag(d))/sum(d)
+```
+
+# Check and clean test data
+#### Impute age
+#### transform Pclass
+#### Change Parch and SibSp to Factors
+#### Change Cabin to known and unknown
+```{r}
+ggplot(test,aes(Sex)) + geom_bar(color='black',alpha=0.5) + labs(title ='Count of Men and Women Aboard')
+
+#change NA values to 0
+missmap(test, main='Missing data', col=c("yellow","black"), legend = FALSE)
+summary(test$Fare)
+test$Fare[is.na(test$Fare)] <- 0
+missmap(test, main='Missing data', col=c("yellow","black"), legend = FALSE)
+
+#Name
+s <- data.frame(str_split_fixed(test$Name, ",", 2))
+s1 <- data.frame(str_split_fixed(s$X2, ". ", 2))
+test$Name <- s1$X1
+str(test$Name)
+table(test$Name)
+test$Name <- as.character(test$Name)
+test$Name <- sapply(test$Name, name.change)
+
+
+#Age
+test$Age <-fillin_age(test$Age, test$Pclass)
+
+#Parent Children
+test$Parch <-change(test$Parch)
+
+#Cabin
+test$Cabin <- as.character(test$Cabin)
+test$Cabin <- splt(test$Cabin)
+test$Cabin <- known(test$Cabin)
+test$Cabin <- as.factor(test$Cabin)
+
+
+#Factor Things Up
+test$Pclass <- as.factor(test$Pclass)
+test$Parch <- as.factor(test$Parch)
+test$SibSp <- as.factor(test$SibSp)
+test$Name <- as.factor(test$Name)
+
+test <- select(test,-PassengerId,-Ticket)
+```
+
+# Use model to predict Survival
+
+```{r}
+test$fitted.probabilities = predict(final.log.model, newdata=test, type="response")
+fitted.results <- ifelse(test$fitted.probabilities > 0.5,1,0)
+test$Survived <-fitted.results
+```
+
+#Percent Survival
+
+```{r}
+sum.surv <- subset(test, test$Survived == 1)
+perc.surv <-nrow(sum.surv)/nrow(test)
+```
+
+#predicted precent of survial on test data
+
+```{r}
+print(perc.surv)
+```
+
+#actual percent of survival for the titanic
+
+```{r}
+print((2224-1502)/2224)
+```
+
+#Check out old data visually for accuracy of prediction
+
+```{r}
+test$Survived <- as.factor(test$Survived)
+ggplot(test,aes(Sex)) + geom_bar(aes(fill=factor(Survived)), alpha=0.5) + labs(title ='Count of Men and Women Aboard')
+ggplot(test, aes(factor(Name))) + geom_bar(aes(fill=factor(Survived)), alpha=0.5) + labs(title ='Title')
+
+```
+
+# Try Random Forest to see if accuracy improves
+#### Similar accuracy to Logistic Regression
+
+
+```{r}
+rf.model <- randomForest(Survived ~., data=final.train)
+predicted.values1 <- predict(rf.model,final.test[2:10])
+d <- table(predicted.values1,final.test$Survived)
+print(d)
+sum(diag(d))/sum(d)
+
+```
+# Use all train data for new Logistic Regression model
+```{r}
+
+final.final.log.model <- glm(Survived ~ . , family = binomial(link='logit'),data = train)
+summary(final.final.log.model)
+
+fitted.probabilities1 <- predict(final.final.log.model,newdata=test[1:9],type='response')
+test$fitprob <- fitted.probabilities1
+fitted.results1 <- ifelse(test$fitprob > 0.5,1,0)
+
+test$Survived1 <-fitted.results1
+sum.surv <- subset(test, test$Survived1 == 1)
+perc.surv <-nrow(sum.surv)/nrow(test)
+print(perc.surv)
+```
+# Actual percent of passengers that survived on the Titanic
+
+```{r}
+print((2224-1502)/2224)
+```
+
+
+#### Check out old data visually for accuracy of prediction
+
+```{r}
+ggplot(test,aes(Sex)) + geom_bar(aes(fill=factor(Survived1)), alpha=0.5) + labs(title ='Count of Men and Women Aboard')
+ggplot(test, aes(factor(Name))) + geom_bar(aes(fill=factor(Survived1)), alpha=0.5) + labs(title ='Title')
+
+```
+
+# Write the solution to file
+
+```{r}
+
+test1  <- read.csv("../input/test.csv")
+
+submission <- data.frame(PassengerID = test1$PassengerId, Survived = test$Survived)
+head(submission)
+write.csv(submission, file = 'rf_predictions.csv', row.names = F)
+
+
+
+
+
+
