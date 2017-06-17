@@ -19,7 +19,7 @@
   <li>test (1).csv</li>
 </ul>
 <h3>Loan Paid in Full: Support Vector Machine</h3>
-<p>This script looks at borrowers information including: purpose of loan, interest rate, number of installments, log of annual income, dti score, fico score, days with credit line, revolving balence. The script uses support vector machine to predict wether a loan will be paid back</p>
+<p>This script looks at borrowers information including: purpose of loan, interest rate, number of installments, log of annual income, dti score, fico score, days with credit line, revolving balence. The script uses a support vector machine model to predict wether a loan will be paid back</p>
 <h4>Files</h4>
 <ul>
   <li>titanic.Rmd</li>
